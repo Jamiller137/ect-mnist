@@ -210,30 +210,38 @@ def create_processed_data(input_filename, output_filename, n_directions=64, n_th
                     print("\nFirst computed feature matrix (Euler characteristics):")
                     print(features[idx])
 
+def fibonacci_sphere(n_points):
+    """Generate points on a sphere using the Fibonacci spiral method."""
+    points = []
+    phi = np.pi * (3. - np.sqrt(5.))  # golden angle in radians
+
+    for i in range(n_points):
+        y = 1 - (i / float(n_points - 1)) * 2  # y goes from 1 to -1
+        radius = np.sqrt(1 - y * y)  # radius at y
+
+        theta = phi * i  # golden angle increment
+
+        x = np.cos(theta) * radius
+        z = np.sin(theta) * radius
+
+        points.append([x, y, z])
+
+    return np.array(points)
+
 def main():
     input_filename = "data/preprocessed_data/mnist_3d_cloud_curvy.h5"
-    output_filename = "data/mnist_processed_ect_64.h5"
+    output_filename = "data/mnist_points_ect_64.h5"
 
     n_directions = 64
     n_thresholds = 64
 
-    thetas = np.linspace(start=0, stop=2 * np.pi, num=n_directions // 2)
-    phis = np.linspace(start=0, stop=np.pi, num=n_directions // 2)
-    thetas, phis = np.meshgrid(thetas, phis)
+    # generate directions using Fibonacci sphere method
+    directions = fibonacci_sphere(n_directions)
 
-    directions = (
-        np.array(
-            [np.sin(phis) * np.cos(thetas), np.sin(phis) * np.sin(thetas), np.cos(phis)]
-        )
-        .reshape(3, -1)
-        .T[:n_directions]
-    )
+    # ensure unit vectors
     directions /= np.linalg.norm(directions, axis=1)[:, np.newaxis]
 
     thresholds = np.linspace(start=-1, stop=1, num=n_thresholds)
-
-    print(f"Directions: {directions}")
-    print(f"Thresholds: {thresholds}")
 
     print("Creating processed data...")
     create_processed_data(
@@ -245,6 +253,7 @@ def main():
         thresholds=thresholds
     )
     print(f"Data saved to {output_filename}")
+
 
 if __name__ == "__main__":
     main()

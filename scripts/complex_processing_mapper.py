@@ -164,29 +164,8 @@ def create_processed_data(input_filename, output_filename, n_directions=64, n_th
         n_samples = len(f["points_3d"].keys())
         print(f"Found {n_samples} samples")
 
-        # find global min/max values
-        print("Computing global threshold range...")
-        global_min = float('inf')
-        global_max = float('-inf')
-
-        for idx in tqdm.tqdm(range(n_samples), desc="Finding global range"):
-            points = f[f"points_3d/points_{idx}"][:]
-            mapper_result = compute_mapper_graph(points, dimension=1)
-            centroids = compute_centroids(points, mapper_result)
-
-            for direction in directions:
-                dot_products = [np.dot(centroids[vertex_id], direction) 
-                              for vertex_id in range(len(mapper_result.nodes))]
-                global_min = min(global_min, min(dot_products))
-                global_max = max(global_max, max(dot_products))
-
-        # add small padding to global range
-        padding = (global_max - global_min) * 0.05
-        global_min -= padding
-        global_max += padding
-
-        # create fixed global thresholds
-        global_thresholds = np.linspace(global_min, global_max, n_thresholds)
+        # Create standardized thresholds between -1 and 1
+        standardized_thresholds = np.linspace(-1, 1, n_thresholds)
 
         print("Creating output file...")
         with h5py.File(output_filename, "w") as out_f:
@@ -197,7 +176,6 @@ def create_processed_data(input_filename, output_filename, n_directions=64, n_th
             )
             labels = out_f.create_dataset("labels", shape=(n_samples,), dtype=np.int16)
 
-            # Second pass: compute ECT using global thresholds
             for idx in tqdm.tqdm(range(n_samples), desc="Processing point clouds"):
                 points = f[f"points_3d/points_{idx}"][:]
                 label = f[f"points_3d/points_{idx}"].attrs["label"]
@@ -215,15 +193,28 @@ def create_processed_data(input_filename, output_filename, n_directions=64, n_th
                     continue
 
                 for i, direction in enumerate(directions):
+                    # Calculate dot products
                     dot_products = [np.dot(complex.vertex_coords[vertex_id], direction) 
                                   for vertex_id in range(len(mapper_result.nodes))]
 
-                    for vertex_id, dot_prod in enumerate(dot_products):
+                    # Normalize dot products to [-1, 1] range
+                    if len(dot_products) > 0:
+                        max_abs = max(abs(max(dot_products)), abs(min(dot_products)))
+                        if max_abs > 0:  # Avoid division by zero
+                            normalized_dots = [dp / max_abs for dp in dot_products]
+                        else:
+                            normalized_dots = dot_products
+                    else:
+                        normalized_dots = dot_products
+
+                    # Set normalized values to vertices
+                    for vertex_id, dot_prod in enumerate(normalized_dots):
                         complex.set_vertex_function(vertex_id=vertex_id, value=dot_prod)
 
                     complex.extend_function(method="max")
 
-                    for j, threshold in enumerate(global_thresholds):
+                    # Use standardized thresholds directly
+                    for j, threshold in enumerate(standardized_thresholds):
                         chi = complex.euler_characteristic(threshold=threshold)
                         features[idx, i, j] = chi
 
@@ -233,6 +224,25 @@ def create_processed_data(input_filename, output_filename, n_directions=64, n_th
                     print("\nFirst computed feature matrix (Euler characteristics):")
                     print(features[idx])
 
+
+def fibonacci_sphere(n_points):
+    """Generate points on a sphere using the Fibonacci spiral method."""
+    points = []
+    phi = np.pi * (3. - np.sqrt(5.))  # golden angle in radians
+
+    for i in range(n_points):
+        y = 1 - (i / float(n_points - 1)) * 2  # y goes from 1 to -1
+        radius = np.sqrt(1 - y * y)  # radius at y
+
+        theta = phi * i  # golden angle increment
+
+        x = np.cos(theta) * radius
+        z = np.sin(theta) * radius
+
+        points.append([x, y, z])
+
+    return np.array(points)
+
 def main():
     input_filename = "data/preprocessed_data/mnist_3d_cloud_curvy.h5"
     output_filename = "data/mnist_mapper_ect_64.h5"
@@ -240,17 +250,10 @@ def main():
     n_directions = 64
     n_thresholds = 64
 
-    thetas = np.linspace(start=0, stop=2 * np.pi, num=n_directions // 2)
-    phis = np.linspace(start=0, stop=np.pi, num=n_directions // 2)
-    thetas, phis = np.meshgrid(thetas, phis)
+    # Generate directions using Fibonacci sphere method
+    directions = fibonacci_sphere(n_directions)
 
-    directions = (
-        np.array(
-            [np.sin(phis) * np.cos(thetas), np.sin(phis) * np.sin(thetas), np.cos(phis)]
-        )
-        .reshape(3, -1)
-        .T[:n_directions]
-    )
+    # Ensure unit vectors
     directions /= np.linalg.norm(directions, axis=1)[:, np.newaxis]
 
     thresholds = np.linspace(start=-1, stop=1, num=n_thresholds)
