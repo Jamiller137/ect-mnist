@@ -32,6 +32,11 @@ class DrawingApp:
         self.root = root
         self.root.title("Digit Recognition App")
 
+        self.current_points = None
+        self.current_complex = None
+        self.current_direction = None
+        self.threshold_var = tk.DoubleVar(value=1.0)
+        
         # main window frame
         main_frame = ttk.Frame(root)
         main_frame.pack(padx=10, pady=10)
@@ -66,10 +71,24 @@ class DrawingApp:
         )
         self.canvas.grid(row=0, column=0, padx=10, pady=10)
 
+        
         # control frame
         self.control_frame = ttk.Frame(main_frame)
         self.control_frame.grid(row=0, column=1, padx=10, pady=10, sticky='n')
 
+        # threshold slider
+        ttk.Label(self.control_frame, text="Threshold:").pack(pady=5)
+        self.threshold_slider = ttk.Scale(
+            self.control_frame,
+            from_=-1.0,
+            to=1.0,
+            orient='horizontal',
+            variable=self.threshold_var,
+            command=lambda x: self.on_threshold_change(),
+            length=200
+        )
+        self.threshold_slider.pack(pady=5)
+        
         # model selection
         ttk.Label(self.control_frame, text="Select Model:").pack(pady=5)
         self.model_var = tk.StringVar(value="")
@@ -81,6 +100,10 @@ class DrawingApp:
         ttk.Button(self.control_frame, text="Clear", command=self.clear_canvas).pack(pady=5)
         ttk.Button(self.control_frame, text="Predict", command=self.predict_digit).pack(pady=5)
         ttk.Button(self.control_frame, text="Load Model", command=self.load_model_dialog).pack(pady=5)
+        
+        
+        
+
 
         # text widget
         self.result_text = tk.Text(self.control_frame, height=15, width=35)
@@ -115,8 +138,12 @@ class DrawingApp:
         self.ect_fig = Figure(figsize=(5, 5))
         self.ect_canvas = FigureCanvasTkAgg(self.ect_fig, self.plot_frame)
         self.ect_canvas.get_tk_widget().grid(row=0, column=3, pady=5, padx=5, sticky='nsew')
-        
-    
+            
+    #  how we update visualization from threshold slider changes
+    def on_threshold_change(self):
+        """Update visualization when threshold changes"""
+        if hasattr(self, 'current_complex') and self.current_complex and self.current_direction is not None:
+            self.update_plots(self.current_complex, self.current_direction)
     
     def load_exemplar_features(self, predicted_class):
         """Load exemplar features from visualization HTML file"""
@@ -244,7 +271,18 @@ class DrawingApp:
         if hasattr(self, 'result_text'):
             self.result_text.delete('1.0', tk.END)
             self.result_text.insert('1.0', "Draw a digit and click predict!")
-        
+        # reset state
+        self.current_points = None
+        self.current_complex = None
+        self.current_direction = None
+
+        # clear the plots
+        if hasattr(self, 'point_cloud_fig'):
+            self.point_cloud_fig.clear()
+            self.point_cloud_canvas.draw()
+        if hasattr(self, 'mapper_fig'):
+            self.mapper_fig.clear()
+            self.mapper_canvas.draw()
     
     
     
@@ -349,53 +387,139 @@ class DrawingApp:
         features = torch.FloatTensor(features).unsqueeze(1)
         return features
     
-    
-    
     def update_plots(self, complex, direction=None):
+        threshold = self.threshold_var.get()
+
         # clear previous plots
         self.point_cloud_fig.clear()
         self.mapper_fig.clear()
 
         # Point Cloud Plot
         ax1 = self.point_cloud_fig.add_subplot(111, projection='3d')
-        scatter = ax1.scatter(
-            self.current_points[:, 0],
-            self.current_points[:, 1],
-            self.current_points[:, 2],
-            c=self.current_points[:, 2],
-            cmap='viridis',
-            s=2
-        )
+
+        if direction is not None:
+            # calculate dot products for coloring
+            dots = np.dot(self.current_points, direction)
+            # filter points based on threshold
+            mask = dots <= threshold
+            visible_points = self.current_points[mask]
+            visible_dots = dots[mask]
+
+            scatter = ax1.scatter(
+                visible_points[:, 0],
+                visible_points[:, 1],
+                visible_points[:, 2],
+                c=visible_dots,  # Color by dot product
+                cmap='viridis',
+                s=2
+            )
+        else:
+            scatter = ax1.scatter(
+                self.current_points[:, 0],
+                self.current_points[:, 1],
+                self.current_points[:, 2],
+                c='blue',
+                s=2
+            )
+
         ax1.set_title('Point Cloud')
-        # removed the colorbar since it didnt add much and was taking up space
-        #self.point_cloud_fig.colorbar(scatter)
+        
+        # set fixed viewing angle and scale:
+        max_range = np.array([
+        self.current_points[:, 0].max() - self.current_points[:, 0].min(),
+        self.current_points[:, 1].max() - self.current_points[:, 1].min(),
+        self.current_points[:, 2].max() - self.current_points[:, 2].min()
+        ]).max() / 2.0
+
+        mid_x = (self.current_points[:, 0].max() + self.current_points[:, 0].min()) * 0.5
+        mid_y = (self.current_points[:, 1].max() + self.current_points[:, 1].min()) * 0.5
+        mid_z = (self.current_points[:, 2].max() + self.current_points[:, 2].min()) * 0.5
+
+        ax1.set_xlim(mid_x - max_range, mid_x + max_range)
+        ax1.set_ylim(mid_y - max_range, mid_y + max_range)
+        ax1.set_zlim(mid_z - max_range, mid_z + max_range)
+
+        
 
         # Mapper Complex Plot
         ax2 = self.mapper_fig.add_subplot(111, projection='3d')
 
-        # plot vertices
-        vertex_coords = np.array([complex.vertex_coords[v] for v in range(len(complex._simplices[0]))])
-        ax2.scatter(
-            vertex_coords[:, 0],
-            vertex_coords[:, 1],
-            vertex_coords[:, 2],
-            c='red',
-            s=50
-        )
+        if direction is not None:
+            # calculate dot products for vertices
+            vertex_coords = np.array([complex.vertex_coords[v] for v in range(len(complex._simplices[0]))])
+            vertex_dots = np.dot(vertex_coords, direction)
 
-        # plot edges
-        for simplex in complex._simplices[1]:
-            v1, v2 = simplex
-            p1 = complex.vertex_coords[v1]
-            p2 = complex.vertex_coords[v2]
-            ax2.plot(
-                [p1[0], p2[0]],
-                [p1[1], p2[1]],
-                [p1[2], p2[2]],
-                'b-'
+            # filter vertices based on threshold
+            mask = vertex_dots <= threshold
+            visible_vertices = np.where(mask)[0]
+            visible_coords = vertex_coords[mask]
+            visible_dots = vertex_dots[mask]
+
+            if len(visible_coords) > 0:
+                scatter = ax2.scatter(
+                    visible_coords[:, 0],
+                    visible_coords[:, 1],
+                    visible_coords[:, 2],
+                    c=visible_dots,  # Color by dot product
+                    cmap='viridis',
+                    s=50
+                )
+
+            # plot edges between visible vertices
+            for simplex in complex._simplices[1]:
+                v1, v2 = simplex
+                if v1 in visible_vertices and v2 in visible_vertices:
+                    p1 = complex.vertex_coords[v1]
+                    p2 = complex.vertex_coords[v2]
+                    # calculate edge color based on max dot product of endpoints
+                    edge_value = max(vertex_dots[v1], vertex_dots[v2])
+                    if edge_value <= threshold:
+                        ax2.plot(
+                            [p1[0], p2[0]],
+                            [p1[1], p2[1]],
+                            [p1[2], p2[2]],
+                            'b-'
+                        )
+        else:
+            # if no direction, show all vertices and edges
+            vertex_coords = np.array([complex.vertex_coords[v] for v in range(len(complex._simplices[0]))])
+            ax2.scatter(
+                vertex_coords[:, 0],
+                vertex_coords[:, 1],
+                vertex_coords[:, 2],
+                c='red',
+                s=50
             )
 
+            for simplex in complex._simplices[1]:
+                v1, v2 = simplex
+                p1 = complex.vertex_coords[v1]
+                p2 = complex.vertex_coords[v2]
+                ax2.plot(
+                    [p1[0], p2[0]],
+                    [p1[1], p2[1]],
+                    [p1[2], p2[2]],
+                    'b-'
+                )
+
         ax2.set_title('Mapper Complex')
+        
+        #set fixed viewing angle and scale:
+        vertex_coords = np.array([complex.vertex_coords[v] for v in range(len(complex._simplices[0]))])
+        max_range = np.array([
+            vertex_coords[:, 0].max() - vertex_coords[:, 0].min(),
+            vertex_coords[:, 1].max() - vertex_coords[:, 1].min(),
+            vertex_coords[:, 2].max() - vertex_coords[:, 2].min()
+        ]).max() / 2.0
+
+        mid_x = (vertex_coords[:, 0].max() + vertex_coords[:, 0].min()) * 0.5
+        mid_y = (vertex_coords[:, 1].max() + vertex_coords[:, 1].min()) * 0.5
+        mid_z = (vertex_coords[:, 2].max() + vertex_coords[:, 2].min()) * 0.5
+
+        ax2.set_xlim(mid_x - max_range, mid_x + max_range)
+        ax2.set_ylim(mid_y - max_range, mid_y + max_range)
+        ax2.set_zlim(mid_z - max_range, mid_z + max_range)
+        
 
         if direction is not None:
             # add direction vector visualization
@@ -412,28 +536,32 @@ class DrawingApp:
                     normalize=True
                 )
 
-            # calculate dot products with direction vector for all points
+            # update canvas overlay
             dots = np.dot(self.current_points, direction)
-
             # normalize dot products to [0, 1] for alpha values
             alphas = (dots - dots.min()) / (dots.max() - dots.min())
+
+            # only show points below threshold
+            mask = dots <= threshold
+            visible_points = self.current_points[mask]
+            visible_alphas = alphas[mask]
 
             # create overlay image
             overlay = Image.new('RGBA', (self.canvas_size, self.canvas_size), (0, 0, 0, 0))
             draw = ImageDraw.Draw(overlay)
 
             # convert normalized points back to canvas coordinates
-            canvas_points = self.current_points.copy()
+            canvas_points = visible_points.copy()
             # rescale from [-0.5, 0.5] to canvas size
             canvas_points[:, :2] = (canvas_points[:, :2] + 0.5) * self.canvas_size
 
             # draw red regions with varying alpha
-            for point, alpha in zip(canvas_points, alphas):
+            for point, alpha in zip(canvas_points, visible_alphas):
                 x, y = point[:2]
                 # ensure coordinates are within canvas bounds
                 if 0 <= x < self.canvas_size and 0 <= y < self.canvas_size:
                     alpha_int = int(alpha * 128)  # max alpha of 128 (semi-transparent)
-                    radius = 4.5  # size of each point 4.5 seemed to look nice
+                    radius = 4.5  # size of each point
                     draw.ellipse([x-radius, y-radius, x+radius, y+radius], 
                             fill=(255, 0, 0, alpha_int))
 
@@ -442,7 +570,12 @@ class DrawingApp:
             # store reference to prevent garbage collection
             self._overlay_photo = overlay_photo
             # create/update overlay on canvas
+            self.canvas.delete('overlay')  # Remove old overlay
             self.canvas.create_image(0, 0, image=overlay_photo, anchor='nw', tags='overlay')
+            
+        # set fixed angle
+        for ax in [ax1, ax2]:
+            ax.view_init(elev=-40, azim=-40)
 
         self.point_cloud_canvas.draw()
         self.mapper_canvas.draw()
@@ -510,15 +643,19 @@ class DrawingApp:
                     directions /= np.linalg.norm(directions, axis=1)[:, np.newaxis]
                     best_direction = directions[best_direction_idx]
 
-                    # update plots with direction vector
+                    # update plots with direction vector and current threshold setting from slider
+                    self.current_direction = best_direction
                     result = compute_mapper_graph(self.current_points, dimension=1)
                     centroids = compute_centroids(self.current_points, result)
                     complex = create_simplicial_complex(result=result, centroids=centroids, point_cloud=self.current_points)
-
+                    self.current_complex = complex
                     self.update_plots(complex, direction=best_direction)
 
                     # update ECT plot
                     self.update_ect_plot(features, exemplar_features, best_direction_idx)
+                    
+                    
+                
 
                 # get all probabilities and sort them
                 probs_and_classes = [(prob.item(), idx) for idx, prob in enumerate(probabilities)]
