@@ -7,13 +7,17 @@ The point of this project is to support the idea that data is actually sampled f
 
 ### From Scratch Usage: 
 - Clone the repo
+- Install dependencies
 - Run the MNIST Loader script
 - Run the Complex Processing Script
 - Run the cnn_training script
    - make sure the paths line up and the number of directions/thresholds make sense for your machine
  
 ### Interactive Application Demo:
-Just run the digit_recognition_app.py file (make sure you have necessary packages installed. 
+Just run the digit_recognition_app.py file (make sure you have necessary packages installed).
+![image](https://github.com/user-attachments/assets/0bb77d22-ff6c-49b8-88a2-2008234e30ec)
+
+The application will take your drawing and do some preprocessing to have a similar format to the MNIST dataset. It will then display the models predictions for each digit. The application will display the point complex, mapper complex, and ECT heatmap for your drawing. The dotted line on the ECT heatmap is the column with least difference from the 'exemplar' digits (the entry in the MNIST dataset closest to the mean of that particular label). It then displays the corresponding direction on the point/mapper complex plots and overlays a copy of your drawing the transparency scaled with the dot product.
 
 - The application relies on the html files output during training
    - if you ran your own training from scratch be sure to include the visualization_digit_x.html files inside of the /app/models/exemplars folder. Also make sure to edit the number of directions and file paths to match what you did.
