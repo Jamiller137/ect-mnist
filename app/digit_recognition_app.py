@@ -252,7 +252,7 @@ class DrawingApp:
                 # reduce line width to be proportional to MNIST scale
                 self.canvas.create_line(
                     self.last_x, self.last_y, event.x, event.y,
-                    width=50,  # Reduced from 20 to 10 for better scaling
+                    width=50, 
                     fill='white', 
                     capstyle=tk.ROUND, 
                     smooth=tk.TRUE
@@ -335,7 +335,7 @@ class DrawingApp:
         self.current_points[:, 0] -= 13.5  # Center x coordinates (28/2 - 0.5)
         self.current_points[:, 1] -= 13.5  # Center y coordinates (28/2 - 0.5)
         self.current_points[:, 2] *= 10    # Scale z coordinates
-        max_radius = np.sqrt(2 * 14**2 + 10**2)  # Changed to match mnist_loader.py
+        max_radius = np.sqrt(2 * 14**2 + 10**2)  # change to match mnist_loader.py
         self.current_points /= max_radius
         mean = np.mean(self.current_points, axis=0)
         self.current_points -= mean
@@ -409,7 +409,7 @@ class DrawingApp:
                 visible_points[:, 0],
                 visible_points[:, 1],
                 visible_points[:, 2],
-                c=visible_dots,  # Color by dot product
+                c=visible_dots,  
                 cmap='viridis',
                 s=2
             )
@@ -460,7 +460,7 @@ class DrawingApp:
                     visible_coords[:, 0],
                     visible_coords[:, 1],
                     visible_coords[:, 2],
-                    c=visible_dots,  # Color by dot product
+                    c=visible_dots, 
                     cmap='viridis',
                     s=50
                 )
@@ -504,7 +504,7 @@ class DrawingApp:
 
         ax2.set_title('Mapper Complex')
         
-        #set fixed viewing angle and scale:
+        # set fixed viewing angle and scale:
         vertex_coords = np.array([complex.vertex_coords[v] for v in range(len(complex._simplices[0]))])
         max_range = np.array([
             vertex_coords[:, 0].max() - vertex_coords[:, 0].min(),
@@ -570,7 +570,7 @@ class DrawingApp:
             # store reference to prevent garbage collection
             self._overlay_photo = overlay_photo
             # create/update overlay on canvas
-            self.canvas.delete('overlay')  # Remove old overlay
+            self.canvas.delete('overlay')  
             self.canvas.create_image(0, 0, image=overlay_photo, anchor='nw', tags='overlay')
             
         # set fixed angle
@@ -811,7 +811,7 @@ class DrawingApp:
     
 def main():
     root = tk.Tk()
-    # linter says it's unused... lier!
+    # linter says it's unused... liar!
     app = DrawingApp(root=root)
     root.mainloop()
     
