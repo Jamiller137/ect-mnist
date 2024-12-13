@@ -9,10 +9,13 @@ dependencies = [
     "matplotlib>=3.9.3",
     "numpy>=2.2.0",
     "pandas>=2.2.3",
+    "pillow>=11.0.0",
     "plotly>=5.24.1",
     "scikit-learn>=1.6.0",
     "seaborn>=0.13.2",
+    "tkinterhtml>=0.7",
     "torch>=2.5.1",
+    "torchvision>=0.20.1",
     "tqdm>=4.67.1",
     "zen-mapper>=0.1.5",
 ]

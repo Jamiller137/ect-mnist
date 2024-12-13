@@ -89,7 +89,7 @@ def load_single_point_cloud(filename, index):
         label = f[f"points_3d/points_{index}"].attrs["label"]
     return points, label
 
-def compute_mapper_graph(point_cloud, dimension=2):
+def compute_mapper_graph(point_cloud, dimension=1):
     projection = point_cloud[:, 0] - point_cloud[:, 1]
     cover_scheme = Width_Balanced_Cover(n_elements=10, percent_overlap=0.4)
 
