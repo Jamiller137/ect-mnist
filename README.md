@@ -17,6 +17,11 @@ The point of this project is to support the idea that data is actually sampled f
 Just run the digit_recognition_app.py file (make sure you have necessary packages installed).
 ![image](https://github.com/user-attachments/assets/0bb77d22-ff6c-49b8-88a2-2008234e30ec)
 
+Newly added: A slider to visualize the simplex at different threshhold values:
+
+![image](https://github.com/user-attachments/assets/7047d99c-68d5-4ae5-b0ad-cdf8ce62f242)
+
+
 The application will take your drawing and do some preprocessing to have a similar format to the MNIST dataset. It will then display the models predictions for each digit. The application will display the point complex, mapper complex, and ECT heatmap for your drawing. The dotted line on the ECT heatmap is the column with least difference from the 'exemplar' digits (the entry in the MNIST dataset closest to the mean of that particular label). It then displays the corresponding direction on the point/mapper complex plots and overlays a copy of your drawing the transparency scaled with the dot product.
 
 - The application relies on the html files output during training
