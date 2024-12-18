@@ -17,7 +17,7 @@ The point of this project is to support the idea that data is actually sampled f
 Just run the digit_recognition_app.py file (make sure you have necessary packages installed).
 ![image](https://github.com/user-attachments/assets/0bb77d22-ff6c-49b8-88a2-2008234e30ec)
 
-Newly added: A slider to visualize the simplex at different threshhold values:
+Newly added: A slider to visualize the mapper complex at different threshhold values:
 
 ![image](https://github.com/user-attachments/assets/7047d99c-68d5-4ae5-b0ad-cdf8ce62f242)
 
